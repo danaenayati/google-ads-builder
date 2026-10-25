@@ -1,5 +1,6 @@
-"""Make an image with the Codex CLI (on macOS the one bundled in the ChatGPT app; elsewhere `codex` on PATH;
-ChatGPT Plus login, no API key) and fit it to Google Ads' exact sizes. Changes nothing in Google Ads."""
+"""Make an image with the Codex CLI (on macOS the one bundled in the ChatGPT app; on Windows codex.exe; elsewhere
+`codex` on PATH; ChatGPT Plus login, no API key) and fit it to Google Ads' exact sizes. Changes nothing in
+Google Ads."""
 
 from __future__ import annotations
 
@@ -13,19 +14,18 @@ from pathlib import Path
 
 from PIL import Image
 
-from .config import Config
+from .config import Config, windows_codex
 from .plans import slugify
 
 SIZES = {"landscape": (1200, 628), "square": (1200, 1200), "portrait": (1200, 1500)}
 ASK = {"landscape": "wide landscape (3:2)", "square": "square (1:1)", "portrait": "tall portrait (2:3)"}
 IMAGE_SUFFIXES = (".png", ".jpg", ".jpeg", ".webp")
 NOT_INSTALLED = "Codex isn't installed; install it or set codex_path in builder.toml"
-# Windows runs a .cmd or .bat file (npm installs codex as codex.cmd) through cmd.exe, which reads the
-# command line by its own rules, so text in an argument could run other commands ("BatBadBut"). The prompt
-# never goes on the command line (Codex reads it from stdin), and with such a file every other argument
-# must be plain: letters, digits and . _ : = / " - only (no spaces, %, !, ^, &, |, <, >, parentheses).
-BATCH_SUFFIXES = (".bat", ".cmd")
-_BATCH_SAFE = re.compile(r'[A-Za-z0-9._:=/"-]+')
+# On Windows only codex.exe runs, by its full path: a .cmd or .bat file would run through cmd.exe, which
+# reads its own command line by other rules. The prompt never goes on the command line (Codex reads it
+# from stdin), so nothing needs a batch file.
+WINDOWS_EXE_ONLY = ("On Windows, codex_path must be the full path of codex.exe (such as C:/Users/YOU/AppData/"
+                    "Roaming/npm/.../bin/codex.exe), never a .cmd or .bat file; see docs/SETUP.md")
 _THREAD = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")  # a folder name: no / \ : or ".."
 
 
@@ -67,22 +67,23 @@ def _tails(proc) -> str:
     return f"stderr: {err} | stdout: {out}"
 
 
-def codex_command(cfg: Config) -> list[str]:
+def codex_program(cfg: Config, windows: bool | None = None) -> str:
+    """The Codex program to run: as configured, and on Windows only a full path to a .exe, normalised as
+    Windows reads it (config.windows_codex). Raises ImageGenerationError otherwise."""
+    windows = sys.platform == "win32" if windows is None else windows
+    if not windows:
+        return str(cfg.codex_path)
+    program = windows_codex(str(cfg.codex_path))
+    if program is None:
+        raise ImageGenerationError(f"{WINDOWS_EXE_ONLY} (codex_path: {cfg.codex_path})")
+    return program
+
+
+def codex_command(cfg: Config, program: str | None = None) -> list[str]:
     """The fixed Codex command. The final "-" makes Codex read the prompt from stdin, so no prompt or plan
     text is ever an argument."""
-    return [str(cfg.codex_path), "exec", "--json", "--skip-git-repo-check", "-s", "read-only",
+    return [program or str(cfg.codex_path), "exec", "--json", "--skip-git-repo-check", "-s", "read-only",
             "-m", cfg.codex_model, "-c", 'model_reasoning_effort="low"', "-"]
-
-
-def batch_problem(cmd: list[str], windows: bool | None = None) -> str | None:
-    """Why this command must not run through a Windows .cmd or .bat file, or None."""
-    windows = sys.platform == "win32" if windows is None else windows
-    if not windows or Path(cmd[0]).suffix.lower() not in BATCH_SUFFIXES:
-        return None
-    if all(_BATCH_SAFE.fullmatch(arg) for arg in cmd[1:]):
-        return None
-    return (f"Codex is a Windows batch file ({cmd[0]}) and an argument has characters cmd.exe could run as "
-            "commands, so it was not started. Check codex_model in builder.toml, or set codex_path to codex.exe.")
 
 
 def generate(prompt: str, shape: str, name: str, cfg: Config, run=subprocess.run) -> dict:
@@ -90,10 +91,7 @@ def generate(prompt: str, shape: str, name: str, cfg: Config, run=subprocess.run
         raise ValueError(f"shape must be one of {', '.join(SIZES)}")
     if cfg.codex_path is None or not Path(cfg.codex_path).is_file():
         raise ImageGenerationError(NOT_INSTALLED + (f" (not found: {cfg.codex_path})" if cfg.codex_path else ""))
-    cmd = codex_command(cfg)
-    problem = batch_problem(cmd)
-    if problem:
-        raise ImageGenerationError(problem)
+    cmd = codex_command(cfg, codex_program(cfg))
     request = (
         f"Use your image generation tool to create ONE {ASK[shape]} image. {prompt}\n"
         "Keep the main subject centred with space around it; the image will be cropped to several shapes.\n"

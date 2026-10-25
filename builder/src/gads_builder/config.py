@@ -4,10 +4,13 @@
 from __future__ import annotations
 
 import math
+import ntpath
 import os
 import re
 import shutil
+import string
 import sys
+import threading
 import tomllib
 import unicodedata
 from dataclasses import dataclass
@@ -19,13 +22,81 @@ DEFAULT_CODEX = "/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/code
 
 
 def default_codex() -> str | None:
-    """Where Codex is when builder.toml doesn't say: the ChatGPT app's on macOS; elsewhere `codex` on PATH
-    (on Windows a real codex.exe first, then npm's codex.cmd). None if it isn't installed."""
+    """Where Codex is when builder.toml doesn't say: the ChatGPT app's on macOS; on Windows a codex.exe on
+    PATH (never one in the current folder) or where npm installs it (see _windows_default_codex); elsewhere
+    `codex` on PATH. None if it isn't installed."""
     if sys.platform == "darwin":
         return DEFAULT_CODEX
     if sys.platform == "win32":
-        return shutil.which("codex.exe") or shutil.which("codex.cmd") or shutil.which("codex")
+        return _windows_default_codex()
     return shutil.which("codex")
+
+
+# ------------------------------------------------------------------ Codex on Windows
+# Windows looks for a program in the current folder before PATH, and the server's current folder can be a
+# repo Claude Code opened, where anyone could have put a codex.exe. So the lookup tells Windows not to
+# (NoDefaultCurrentDirectoryInExePath), and a result is used only as a full path to a .exe whose folder is
+# not the current one. A .cmd or .bat file never runs: cmd.exe would read its arguments as commands.
+_is_file = os.path.isfile  # tests replace these two
+_current_folder = os.getcwd
+_LOOKUP_ENV_LOCK = threading.Lock()
+NO_CURRENT_FOLDER = "NoDefaultCurrentDirectoryInExePath"
+# npm installs only a codex.cmd on PATH; the real program is this codex.exe inside the package:
+NPM_CODEX = ("npm", "node_modules", "@openai", "codex", "node_modules", "@openai")
+NPM_CODEX_EXE = (("codex-win32-x64", "x86_64-pc-windows-msvc"), ("codex-win32-arm64", "aarch64-pc-windows-msvc"))
+
+
+def _same_folder(a: str, b: str) -> bool:
+    if ntpath.normcase(ntpath.normpath(a)) == ntpath.normcase(ntpath.normpath(b)):
+        return True
+    try:
+        return os.path.samefile(a, b)
+    except (OSError, ValueError):
+        return False
+
+
+def windows_codex(value, outside: str | None = None) -> str | None:
+    """`value` as Windows would run it, if it is an acceptable Codex: a full path on a drive (C:\\...), no
+    stream (':' after the drive), ending in .exe once the trailing dots and spaces Windows ignores are
+    dropped, and, with `outside`, not in that folder. Returns the normalised path, or None."""
+    if not isinstance(value, str):
+        return None
+    path = value.rstrip(". ")  # Windows drops trailing dots and spaces from a file name
+    drive, rest = ntpath.splitdrive(path)
+    if (len(drive) != 2 or drive[0] not in string.ascii_letters or drive[1] != ":" or ":" in rest
+            or not ntpath.isabs(path)):
+        return None
+    path = ntpath.normpath(path)
+    name = ntpath.basename(path)
+    if len(name) <= len(".exe") or not name.lower().endswith(".exe"):
+        return None
+    if outside is not None and _same_folder(ntpath.dirname(path), outside):
+        return None
+    return path
+
+
+def _windows_default_codex() -> str | None:
+    here = _current_folder()
+    with _LOOKUP_ENV_LOCK:
+        before = os.environ.get(NO_CURRENT_FOLDER)
+        os.environ[NO_CURRENT_FOLDER] = before or "1"
+        try:
+            found = shutil.which("codex.exe")
+        finally:
+            if before is None:
+                os.environ.pop(NO_CURRENT_FOLDER, None)
+            else:
+                os.environ[NO_CURRENT_FOLDER] = before
+    exe = windows_codex(found, outside=here) if found else None
+    if exe:
+        return exe
+    appdata = os.environ.get("APPDATA", "")
+    for package, target in NPM_CODEX_EXE:
+        exe = windows_codex(ntpath.join(appdata, *NPM_CODEX, package, "vendor", target, "bin", "codex.exe"),
+                            outside=here)
+        if exe and _is_file(exe):
+            return exe
+    return None
 
 
 class ConfigError(Exception):

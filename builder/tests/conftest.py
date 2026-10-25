@@ -40,7 +40,7 @@ def cfg(tmp_path):
         plans_dir=tmp_path / "plans",
         insights_dir=tmp_path / "insights",
         images_dir=tmp_path / "images",
-        codex_path=tmp_path / "codex",
+        codex_path=tmp_path / "codex.exe",  # on Windows only a codex.exe runs
         codex_model="test-model",
         codex_images_dir=tmp_path / "codex-images",
     )

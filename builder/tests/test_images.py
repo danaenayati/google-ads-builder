@@ -124,12 +124,12 @@ def test_generate_rejects_a_broken_image_from_codex(cfg, content):
     assert not any(Path(cfg.images_dir).iterdir())  # nothing half-made is left behind
 
 
-# ------------------------------------------------------------------ Codex missing, prompts and batch files
+# ------------------------------------------------------------------ Codex missing, prompts and Windows
 
 
 @pytest.mark.parametrize("codex", ["missing", None])
 def test_generate_without_codex_says_how_to_fix_it(cfg, codex):
-    cfg = dataclasses.replace(cfg, codex_path=None if codex is None else cfg.codex_path.with_name("no-codex"))
+    cfg = dataclasses.replace(cfg, codex_path=None if codex is None else cfg.codex_path.with_name("no-codex.exe"))
     with pytest.raises(images.ImageGenerationError, match="Codex isn't installed; install it or set codex_path"):
         images.generate("x", "square", "n", cfg, run=lambda *a, **k: pytest.fail("Codex must not run"))
     assert not Path(cfg.images_dir).exists()  # nothing was made
@@ -140,11 +140,9 @@ HOSTILE = ['" & calc & "', "%PATH% ^& whoami | more > out.txt", "$(Remove-Item x
 
 
 @pytest.mark.parametrize("prompt", HOSTILE)
-@pytest.mark.parametrize("platform", ["win32", "darwin", "linux"])
+@pytest.mark.parametrize("platform", ["darwin", "linux"])
 def test_the_prompt_is_never_a_command_line_argument(cfg, monkeypatch, prompt, platform):
     monkeypatch.setattr(images.sys, "platform", platform)
-    cfg = dataclasses.replace(cfg, codex_path=cfg.codex_path.with_name("codex.cmd"))
-    cfg.codex_path.write_bytes(b"")
     calls = []
 
     def fake_run(cmd, **kwargs):
@@ -156,28 +154,42 @@ def test_the_prompt_is_never_a_command_line_argument(cfg, monkeypatch, prompt, p
     [(cmd, kwargs)] = calls
     assert cmd == images.codex_command(cfg) and cmd[-1] == "-"
     assert prompt in kwargs["input"] and not any(prompt in arg for arg in cmd)
-    assert images.batch_problem(cmd, windows=True) is None  # every argument is plain enough for cmd.exe
 
 
-@pytest.mark.parametrize("model", ["gpt&calc", "a b", "m%PATH%", "x|y", "x^y", "x<y", "x>y", "x!y", "(x)", ""])
-@pytest.mark.parametrize("name", ["codex.cmd", "codex.CMD", "codex.bat", "Codex.Bat"])
-def test_a_windows_batch_file_runs_only_with_plain_arguments(cfg, monkeypatch, model, name):
+WINDOWS_EXE = "C:\\Users\\YOU\\AppData\\Roaming\\npm\\node_modules\\@openai\\codex\\node_modules\\@openai\\codex-win32-x64\\vendor\\x86_64-pc-windows-msvc\\bin\\codex.exe"
+
+
+@pytest.mark.parametrize("path", [
+    "C:\\Users\\YOU\\AppData\\Roaming\\npm\\codex.cmd", "C:\\Tools\\codex.CMD", "C:\\Tools\\codex.bat", "C:\\Tools\\Codex.Bat",
+    "C:\\Tools\\codex", "C:\\Tools\\codex.ps1", "C:\\Tools\\codex.exe:evil", "codex.exe", ".\\codex.exe",
+    "\\\\server\\share\\codex.exe", "/usr/local/bin/codex",
+])
+def test_windows_runs_only_codex_exe_by_its_full_path(cfg, path):
+    with pytest.raises(images.ImageGenerationError, match="On Windows, codex_path must be the full path of codex.exe"):
+        images.codex_program(dataclasses.replace(cfg, codex_path=Path(path)), windows=True)
+
+
+@pytest.mark.parametrize("path, program", [
+    (WINDOWS_EXE, WINDOWS_EXE), ("C:/Tools/codex.exe", "C:\\Tools\\codex.exe"), ("C:\\Tools\\codex.exe. .", "C:\\Tools\\codex.exe"),
+])
+def test_windows_runs_codex_exe_as_windows_reads_its_name(cfg, path, program):
+    cfg = dataclasses.replace(cfg, codex_path=Path(path))
+    assert images.codex_program(cfg, windows=True) == program
+    assert images.codex_command(cfg, images.codex_program(cfg, windows=True))[0] == program
+
+
+def test_elsewhere_codex_runs_as_configured(cfg):
+    assert images.codex_program(cfg, windows=False) == str(cfg.codex_path)
+
+
+@pytest.mark.parametrize("name", ["codex.cmd", "codex.bat", "codex"])
+def test_windows_a_batch_file_never_runs(cfg, monkeypatch, name):
     monkeypatch.setattr(images.sys, "platform", "win32")
-    cfg = dataclasses.replace(cfg, codex_path=cfg.codex_path.with_name(name), codex_model=model)
+    cfg = dataclasses.replace(cfg, codex_path=cfg.codex_path.with_name(name))
     cfg.codex_path.write_bytes(b"")
-    with pytest.raises(images.ImageGenerationError, match="Windows batch file"):
+    with pytest.raises(images.ImageGenerationError, match="codex.exe"):
         images.generate("x", "square", "n", cfg, run=lambda *a, **k: pytest.fail("Codex must not run"))
     assert not Path(cfg.images_dir).exists()
-
-
-@pytest.mark.parametrize("name, windows, refused", [
-    ("codex.cmd", True, True), ("codex.bat", True, True), ("codex.exe", True, False), ("codex", True, False),
-    ("codex.cmd", False, False), ("codex", False, False),
-])
-def test_only_windows_batch_files_need_plain_arguments(cfg, name, windows, refused):
-    cmd = images.codex_command(dataclasses.replace(cfg, codex_path=cfg.codex_path.with_name(name),
-                                                   codex_model="bad model&x"))
-    assert (images.batch_problem(cmd, windows=windows) is not None) is refused
 
 
 @pytest.mark.parametrize("thread", ["C:evil", "..", ".", "a/b", "a\\b", "-x", "a b"])

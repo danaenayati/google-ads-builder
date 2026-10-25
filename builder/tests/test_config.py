@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 import pytest
@@ -190,18 +191,101 @@ def test_codex_defaults_to_the_chatgpt_app_on_macos(tmp_path, monkeypatch):
     assert load_config(write(tmp_path, GOOD)).codex_path == Path(config.DEFAULT_CODEX)
 
 
-@pytest.mark.parametrize("platform, found, expected", [
-    ("win32", {"codex.exe": "C:/tools/codex.exe", "codex.cmd": "C:/npm/codex.cmd"}, "C:/tools/codex.exe"),
-    ("win32", {"codex.cmd": "C:/npm/codex.cmd", "codex": "C:/npm/codex"}, "C:/npm/codex.cmd"),
-    ("win32", {}, None),
-    ("linux", {"codex": "/usr/local/bin/codex"}, "/usr/local/bin/codex"),
-    ("linux", {}, None),
-])
-def test_codex_elsewhere_is_found_on_path(tmp_path, monkeypatch, platform, found, expected):
-    monkeypatch.setattr(config.sys, "platform", platform)
+@pytest.mark.parametrize("found, expected", [({"codex": "/usr/local/bin/codex"}, "/usr/local/bin/codex"), ({}, None)])
+def test_codex_on_linux_is_found_on_path(tmp_path, monkeypatch, found, expected):
+    monkeypatch.setattr(config.sys, "platform", "linux")
     monkeypatch.setattr(config.shutil, "which", found.get)
     cfg = load_config(write(tmp_path, GOOD))
     assert cfg.codex_path == (None if expected is None else Path(expected))
+
+
+WIN_CWD = "C:\\Users\\YOU\\project"  # the folder the server runs in: perhaps a repo Claude Code opened
+NPM_BIN = ("C:\\Users\\YOU\\AppData\\Roaming\\npm\\node_modules\\@openai\\codex\\node_modules\\@openai\\"
+           "codex-win32-{arch}\\vendor\\{triple}\\bin\\codex.exe")
+NPM_X64 = NPM_BIN.format(arch="x64", triple="x86_64-pc-windows-msvc")
+NPM_ARM64 = NPM_BIN.format(arch="arm64", triple="aarch64-pc-windows-msvc")
+
+
+@pytest.fixture
+def win(monkeypatch):
+    monkeypatch.setattr(config.sys, "platform", "win32")
+    monkeypatch.setattr(config, "_current_folder", lambda: WIN_CWD)
+    monkeypatch.setattr(config, "_is_file", lambda path: False)  # no npm Codex unless a test says so
+    monkeypatch.setenv("APPDATA", "C:\\Users\\YOU\\AppData\\Roaming")
+    monkeypatch.delenv("NoDefaultCurrentDirectoryInExePath", raising=False)
+
+
+def test_windows_looks_up_only_codex_exe_and_never_in_the_current_folder(tmp_path, win, monkeypatch):
+    asked = []
+
+    def which(name, *args, **kwargs):
+        asked.append((name, os.environ.get("NoDefaultCurrentDirectoryInExePath")))
+        return "C:\\Tools\\codex.exe"
+
+    monkeypatch.setattr(config.shutil, "which", which)
+    assert str(load_config(write(tmp_path, GOOD)).codex_path) == "C:\\Tools\\codex.exe"
+    assert asked == [("codex.exe", "1")]  # Windows' own rule: don't search the current folder first
+    assert "NoDefaultCurrentDirectoryInExePath" not in os.environ  # put back as it was
+
+
+def test_windows_keeps_an_existing_no_current_folder_setting(tmp_path, win, monkeypatch):
+    monkeypatch.setenv("NoDefaultCurrentDirectoryInExePath", "yes")
+    monkeypatch.setattr(config.shutil, "which", lambda name, *a, **k: "C:\\Tools\\codex.exe")
+    load_config(write(tmp_path, GOOD))
+    assert os.environ["NoDefaultCurrentDirectoryInExePath"] == "yes"
+
+
+@pytest.mark.parametrize("found", [
+    ".\\codex.exe", "codex.exe", "bin\\codex.exe",  # relative: the current folder, or a relative PATH entry
+    "C:\\Users\\YOU\\project\\codex.exe", "c:\\users\\you\\PROJECT\\Codex.EXE", "C:/Users/YOU/project/codex.exe",
+    "C:\\Users\\YOU\\project\\.\\codex.exe", "C:\\Users\\YOU\\other\\..\\project\\codex.exe",
+    "C:\\Users\\YOU\\project\\codex.exe. .",  # Windows drops the trailing dots and spaces: still the current folder
+    "C:\\Tools\\codex.cmd", "C:\\Tools\\codex.bat", "C:\\Tools\\codex", "C:\\Tools\\codex.ps1", "C:\\Tools\\.exe",
+    "C:\\Tools\\codex.exe:evil", "C:\\Tools\\codex.exe::$DATA", "C:\\Tools\\x:codex.exe",  # NTFS streams
+    "C:codex.exe", "\\Tools\\codex.exe",  # not a full path
+    "\\\\server\\share\\codex.exe", "\\\\?\\C:\\Tools\\codex.exe", "\\\\.\\C:\\Tools\\codex.exe",  # network and device paths
+    "",
+])
+def test_windows_refuses_a_codex_that_could_be_planted_or_is_not_an_exe(tmp_path, win, monkeypatch, found):
+    monkeypatch.setattr(config.shutil, "which", lambda name, *a, **k: found)
+    assert load_config(write(tmp_path, GOOD)).codex_path is None
+    assert config.windows_codex(found, outside=WIN_CWD) is None
+
+
+@pytest.mark.parametrize("found, expected", [
+    ("C:\\Tools\\codex.exe", "C:\\Tools\\codex.exe"),
+    ("C:/Tools/codex.exe", "C:\\Tools\\codex.exe"),
+    ("C:\\Tools\\codex.exe. . ", "C:\\Tools\\codex.exe"),  # as Windows reads it
+    ("D:\\Apps\\CODEX.EXE", "D:\\Apps\\CODEX.EXE"),
+    ("C:\\Users\\YOU\\project\\tools\\codex.exe", "C:\\Users\\YOU\\project\\tools\\codex.exe"),  # an absolute PATH entry
+])
+def test_windows_accepts_codex_exe_by_its_full_path(tmp_path, win, monkeypatch, found, expected):
+    monkeypatch.setattr(config.shutil, "which", lambda name, *a, **k: found)
+    assert str(load_config(write(tmp_path, GOOD)).codex_path) == expected
+
+
+@pytest.mark.parametrize("installed", [NPM_X64, NPM_ARM64])
+def test_windows_finds_codex_exe_where_npm_installs_it(tmp_path, win, monkeypatch, installed):
+    monkeypatch.setattr(config.shutil, "which", lambda name, *a, **k: None)  # npm puts only codex.cmd on PATH
+    monkeypatch.setattr(config, "_is_file", lambda path: path == installed)
+    assert str(load_config(write(tmp_path, GOOD)).codex_path) == installed
+
+
+@pytest.mark.parametrize("appdata", [None, "", "AppData\\Roaming", "\\\\server\\profiles\\YOU\\AppData\\Roaming"])
+def test_windows_without_a_usable_appdata_folder_does_not_guess(tmp_path, win, monkeypatch, appdata):
+    if appdata is None:
+        monkeypatch.delenv("APPDATA")
+    else:
+        monkeypatch.setenv("APPDATA", appdata)
+    monkeypatch.setattr(config.shutil, "which", lambda name, *a, **k: None)
+    monkeypatch.setattr(config, "_is_file", lambda path: True)
+    assert load_config(write(tmp_path, GOOD)).codex_path is None
+
+
+def test_windows_codex_normalises_what_windows_would_run():
+    assert config.windows_codex("C:\\Tools\\sub\\..\\codex.exe . .") == "C:\\Tools\\codex.exe"
+    assert config.windows_codex("C:\\Users\\YOU\\project\\codex.exe") == "C:\\Users\\YOU\\project\\codex.exe"  # no folder to avoid
+    assert config.windows_codex(None) is None and config.windows_codex(5) is None
 
 
 def test_codex_path_in_the_config_wins(tmp_path, monkeypatch):

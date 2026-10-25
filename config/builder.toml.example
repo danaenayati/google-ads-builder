@@ -10,7 +10,8 @@ insights_dir = "~/Documents/Google Ads/Insights"
 images_dir = "~/Documents/Google Ads/Images"
 # check_max_age_hours = 24          # a passed check_plan expires after this (at most 168)
 # codex_path = "/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex"  # default on a Mac
-# codex_path = "C:/Users/YOU/AppData/Roaming/npm/codex.cmd"  # elsewhere the default is `codex` on PATH
+# codex_path = "C:/Tools/codex/codex.exe"  # Windows: the full path of codex.exe only; the default is codex.exe
+#                                          # on PATH or from npm (docs/SETUP.md, "Optional: images with Codex")
 # codex_model = "gpt-6-luna"        # list models with: codex debug models
 # blocked_words = ["CompetitorName"]  # words that must never appear in ad text
 domains = ["example.com"]           # Search final URLs and sitelinks: https on these hosts or their subdomains
