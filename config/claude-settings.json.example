@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "ask": [
+      "mcp__google-ads-builder__create_campaign_from_plan",
+      "mcp__google-ads-builder__upload_images",
+      "mcp__google-ads-builder__update_campaign_assets"
+    ],
+    "deny": [
+      "Read(~/.config/google-ads-mcp/**)"
+    ]
+  }
+}

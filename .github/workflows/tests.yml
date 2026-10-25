@@ -1,0 +1,35 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: builder
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: Install
+        run: uv sync --frozen
+      - name: Offline tests (live tests are skipped without GADS_LIVE)
+        run: uv run --frozen pytest -q -p no:cacheprovider
+        env:
+          # On Windows, also open the real approval window once; its timer closes it as Cancel after 3 seconds.
+          GADS_WINDOW_TEST: ${{ runner.os == 'Windows' && '1' || '' }}
+      - name: Start the server like Claude Code does
+        run: uv run --frozen python scripts/smoke.py
+        env:
+          GADS_BUILDER_CONFIG: ${{ github.workspace }}/config/builder.toml.example

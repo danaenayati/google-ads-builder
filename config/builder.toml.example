@@ -1,0 +1,22 @@
+# The builder's private settings. Save as ~/.config/google-ads-mcp/builder.toml
+# (Windows: %USERPROFILE%\.config\google-ads-mcp\builder.toml) and fill in. "~" is your home folder.
+# On Windows, write paths with forward slashes, such as "C:/Users/YOU/Pictures/ads".
+customer_id = "123-456-7890"        # the ad account (scripts/check_access.py lists it)
+currency = "USD"                    # the account currency (check_access.py shows it)
+daily_budget_cap = 1000             # budgets above this need the exact amount confirmed
+country_code = "US"                 # two-letter country for location lookups
+plans_dir = "~/Documents/Google Ads/Plans"
+insights_dir = "~/Documents/Google Ads/Insights"
+images_dir = "~/Documents/Google Ads/Images"
+# check_max_age_hours = 24          # a passed check_plan expires after this (at most 168)
+# codex_path = "/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex"  # default on a Mac
+# codex_path = "C:/Users/YOU/AppData/Roaming/npm/codex.cmd"  # elsewhere the default is `codex` on PATH
+# codex_model = "gpt-6-luna"        # list models with: codex debug models
+# blocked_words = ["CompetitorName"]  # words that must never appear in ad text
+domains = ["example.com"]           # Search final URLs and sitelinks: https on these hosts or their subdomains
+# brand_words = ["Pulse"]           # keywords with these words are brand keywords (kept in their own campaign)
+
+[[apps]]                            # every app campaigns may promote
+store = "GOOGLE_APP_STORE"
+id = "com.example.app"
+deep_link_prefixes = ["myapp://"]   # optional: every final_app_urls deep link must start with one of these

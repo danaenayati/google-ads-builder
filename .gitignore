@@ -1,0 +1,16 @@
+# Credentials must never be committed.
+client_secret*.json
+*.apps.googleusercontent.com.json
+google-ads.yaml
+adc.json
+application_default_credentials.json
+google_ads_token.json
+.env
+.mcp.json
+
+# Local noise
+.DS_Store
+__pycache__/
+*.pyc
+.venv/
+builder.toml

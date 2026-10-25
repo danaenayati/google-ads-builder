@@ -1,0 +1,61 @@
+{
+  "_readme": "Pick the block for your computer (mac or windows) and copy what is inside its mcpServers into the mcpServers of a .mcp.json file, or use the claude mcp add commands in docs/SETUP.md instead. Replace YOU with your user name. If Claude Code can't find uv or uvx, put their full path in command (find it with: which uv on a Mac, where.exe uv in Windows PowerShell).",
+  "mac": {
+    "mcpServers": {
+      "google-ads": {
+        "command": "uvx",
+        "args": [
+          "--from",
+          "git+https://github.com/googleads/google-ads-mcp.git",
+          "google-ads-mcp"
+        ],
+        "env": {
+          "GOOGLE_APPLICATION_CREDENTIALS": "/Users/YOU/.config/google-ads-mcp/adc.json"
+        }
+      },
+      "google-ads-builder": {
+        "command": "uv",
+        "args": [
+          "run",
+          "--frozen",
+          "--project",
+          "/Users/YOU/google-ads-builder/builder",
+          "gads-builder"
+        ],
+        "env": {
+          "GADS_BUILDER_CONFIG": "/Users/YOU/.config/google-ads-mcp/builder.toml"
+        }
+      }
+    }
+  },
+  "windows": {
+    "mcpServers": {
+      "google-ads": {
+        "command": "uvx",
+        "args": [
+          "--from",
+          "git+https://github.com/googleads/google-ads-mcp.git",
+          "google-ads-mcp"
+        ],
+        "env": {
+          "GOOGLE_APPLICATION_CREDENTIALS": "C:\\Users\\YOU\\.config\\google-ads-mcp\\adc.json",
+          "PYTHONUTF8": "1"
+        }
+      },
+      "google-ads-builder": {
+        "command": "uv",
+        "args": [
+          "run",
+          "--frozen",
+          "--project",
+          "C:\\Users\\YOU\\google-ads-builder\\builder",
+          "gads-builder"
+        ],
+        "env": {
+          "GADS_BUILDER_CONFIG": "C:\\Users\\YOU\\.config\\google-ads-mcp\\builder.toml",
+          "PYTHONUTF8": "1"
+        }
+      }
+    }
+  }
+}
