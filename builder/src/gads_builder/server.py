@@ -1511,12 +1511,16 @@ def _window_problem(lines: list[str]) -> list[str]:
     return [confirm.TOO_MANY_LINES] if len(lines) > confirm.MAX_LINES else []
 
 
-def _person_approves(lines: list[str]) -> bool:
-    """The builder's own Yes/No window on the person's computer. An error counts as No."""
+def _person_approves(lines: list[str]) -> tuple[bool, str | None]:
+    """The builder's own Yes/No window on the person's computer: (approved, None) for the person's answer
+    (an error once the window is up counts as No), or (False, why) if no window could be shown at all,
+    which is not the person's No."""
     try:
-        return confirm.ask_person(WINDOW_TITLE, lines) is True
+        return confirm.ask_person(WINDOW_TITLE, lines) is True, None
+    except confirm.WindowUnavailable as e:
+        return False, str(e) or confirm.couldnt_start("no reason given", "computer")
     except Exception:
-        return False
+        return False, None
 
 
 def _live_extra(facts: dict) -> dict:
@@ -1783,6 +1787,8 @@ def _apply(plan_path: str, *, kind: str | tuple[str, ...], tool: str, result_nam
     account, the plan or (for the campaign of an asset update) the live account. Then the request is
     compiled once; the person approves it in the builder's own window; and only those exact
     operations are sent, once, if this server's check_plan passed on the same bytes."""
+    if not confirm.window_supported():  # Linux and the like: no window can open, so refuse before any Google read
+        return {"done": False, "errors": [confirm.UNSUPPORTED]}
     request = _prepare(plan_path, kind=kind, tool=tool, customer_id=customer_id, shown_fingerprint=shown_fingerprint,
                        shown=shown, shown_live=shown_live)
     if not isinstance(request, _Request):
@@ -1839,9 +1845,8 @@ def _prepare(plan_path: str, *, kind: str | tuple[str, ...], tool: str, customer
 
 def _ask(r: _Request, tool: str) -> list[str]:
     """The approval window, only for a request that would go ahead right now, and never over another
-    open window. [] if the person approved; otherwise why not."""
-    if not confirm.window_supported():  # Linux and the like: no window can open, so nothing can be approved
-        return [confirm.UNSUPPORTED]
+    open window. [] if the person approved; otherwise why not. Only the person's No is recorded and counted
+    toward MAX_DECLINES: a window that couldn't start (or another one open) is neither."""
     with _APPLY_LOCK:
         try:
             checks.require_check(r.folder, r.fingerprint, r.cfg.check_max_age_hours,
@@ -1852,9 +1857,11 @@ def _ask(r: _Request, tool: str) -> list[str]:
     if not _WINDOW_LOCK.acquire(blocking=False):  # never a second window over the first one
         return [WINDOW_OPEN]
     try:
-        approved = _person_approves(r.lines)  # outside _APPLY_LOCK: it can take up to a minute
+        approved, unavailable = _person_approves(r.lines)  # outside _APPLY_LOCK: it can take up to a minute
     finally:
         _WINDOW_LOCK.release()
+    if unavailable is not None:
+        return [unavailable]
     _record_approval(r.folder, tool, r.fingerprint, r.digest, approved, r.lines)
     if approved:
         return []

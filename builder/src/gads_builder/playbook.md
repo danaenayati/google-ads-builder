@@ -48,8 +48,12 @@ account's own history. Safety comes from the plan -> check -> approval flow.
    - After 3 Cancels (a timeout or a closed window counts as one) for the same plan, that plan is
      refused for good, even after `check_plan` or a restart: ask the person what they want and draft a
      new plan.
-   - Only one approval window opens at a time. "Another approval window is open" means the person
-     must answer that one first; nothing changed.
+   - Only one approval window opens at a time, across all Claude Code sessions. "Another approval window
+     is open" (or "is already open on this computer") means the person must answer that one first;
+     nothing changed.
+   - "The approval window couldn't start" means no window opened (for example, PowerShell is locked
+     down): nothing changed and it isn't a Cancel. Show the person the message and the fix from
+     TROUBLESHOOTING.md; don't call the tool again on your own.
 9. **After creation**, call `quality_report` and propose fixes. Each fix is a new `draft_plan`, with
    a new path and fingerprint: draft -> check -> approval.
 10. **Never say a campaign is live.** It is created PAUSED, and the person switches it on in Google

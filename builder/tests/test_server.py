@@ -1415,14 +1415,52 @@ def test_no_second_window_while_one_is_open(wired, window, app_plan):
     assert create(out)["done"] is True  # nothing was used up or counted as a No
 
 
-def test_where_no_window_can_open_the_change_is_refused_and_says_why(wired, window, app_plan, monkeypatch):
+def test_where_no_window_can_open_the_change_is_refused_first_and_says_why(wired, window, app_plan, monkeypatch):
     out = checked(app_plan())
+    reads = (gads.search, gads.account_currency, server.load_config)
     monkeypatch.setattr(confirm, "window_supported", lambda: False)  # Linux and the like
+    # Refused before anything else: no config, and above all no live Google reads, so a retry costs nothing.
+    monkeypatch.setattr(gads, "search", lambda *a, **k: pytest.fail("a live Google read"))
+    monkeypatch.setattr(gads, "account_currency", lambda *a, **k: pytest.fail("a live Google read"))
+    monkeypatch.setattr(server, "load_config", lambda: pytest.fail("the config was read"))
     for _ in range(4):  # not counted as a No, so it never declines the plan for good
         assert create(out) == {"done": False, "errors": [confirm.UNSUPPORTED]}
+    assert server.upload_images("anything", CID, "x" * 12, 1) == {"done": False, "errors": [confirm.UNSUPPORTED]}
+    assert server.update_campaign_assets("anything", CID, "x" * 12, "c", "PAUSED", [], []) == {
+        "done": False, "errors": [confirm.UNSUPPORTED]}
     assert window.shown == [] and real(wired) == [] and _approvals(folder_of(out)) == []
     monkeypatch.setattr(confirm, "window_supported", lambda: True)
+    monkeypatch.setattr(gads, "search", reads[0])
+    monkeypatch.setattr(gads, "account_currency", reads[1])
+    monkeypatch.setattr(server, "load_config", reads[2])
     assert create(out)["done"] is True  # nothing was used up
+
+
+@pytest.mark.parametrize("message", [
+    confirm.ANOTHER_WINDOW,
+    "The approval window couldn't start on this PC: Cannot add type. Nothing was changed.",
+    confirm.UNSUPPORTED,
+])
+def test_a_window_that_could_not_start_is_not_a_no(wired, window, app_plan, message):
+    out = checked(app_plan())
+    window.answer = confirm.WindowUnavailable(message)
+    for _ in range(5):  # never counted as a No, so it never declines the plan for good
+        assert create(out) == {"done": False, "errors": [message]}
+    assert NOT_APPROVED_TEXT not in message
+    assert real(wired) == [] and _approvals(folder_of(out)) == [] and checks.declines(folder_of(out)) == 0
+    assert len(window.shown) == 5
+    window.answer = True
+    assert create(out)["done"] is True  # the pass was not used up
+
+
+NOT_APPROVED_TEXT = "Cancel, closed or timed out"
+
+
+def test_only_a_person_s_no_says_cancel_closed_or_timed_out():
+    assert NOT_APPROVED_TEXT in server.NOT_APPROVED
+    for message in (confirm.ANOTHER_WINDOW, confirm.UNSUPPORTED, confirm.couldnt_start("x", "PC"),
+                    confirm.couldnt_start("x", "Mac")):
+        assert NOT_APPROVED_TEXT not in message and message.endswith("Nothing was changed.")
 
 
 def test_a_second_change_tool_is_refused_at_once_while_the_first_window_waits(wired, app_plan, monkeypatch):
