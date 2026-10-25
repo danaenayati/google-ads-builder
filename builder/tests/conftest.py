@@ -352,8 +352,13 @@ def _fresh_check_memory():
     checks.clear_passes()
 
 
+@pytest.fixture(scope="session")
+def _test_lock_dir(tmp_path_factory):
+    return tmp_path_factory.mktemp("approval-lock")
+
+
 @pytest.fixture(autouse=True)
-def _no_real_approval_window(monkeypatch):
+def _no_real_approval_window(monkeypatch, _test_lock_dir):
     """No test may open a real dialog. A test that reaches the approval window replaces it; a test of
     the real ask_person replaces the subprocess runner it uses (test_confirm.py)."""
 
@@ -362,6 +367,8 @@ def _no_real_approval_window(monkeypatch):
 
     monkeypatch.setattr(confirm, "ask_person", refuse)
     monkeypatch.setattr(confirm, "_run", refuse)
+    # The one-window lock of the real ask_person: a file of the tests' own, never the person's.
+    monkeypatch.setattr(confirm, "LOCK_PATH", _test_lock_dir / "approval-window.lock")
     # Server tests replace the window itself, on every system the tests run on (Linux too); whether a
     # system can show the window is tested on its own (test_confirm.py, test_server.py).
     monkeypatch.setattr(confirm, "window_supported", lambda: True)
