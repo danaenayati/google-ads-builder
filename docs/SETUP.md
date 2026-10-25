@@ -170,13 +170,13 @@ This proves that the window appears on your computer. Nothing is created.
 
 2. Claude shows the plan's summary, and Google checks it in check-only mode.
 3. Claude Code asks whether to run `create_campaign_from_plan`. Choose **Yes**: the builder's own window is the real gate.
-4. A window titled **Google Ads: approve this change?** opens on top of your other windows. It lists the account, the campaign and the budget.
+4. A window titled **Google Ads: approve this change?** opens on top of your other windows. It lists the account, the campaign and the budget. On Windows, **Approve** stays greyed out for its first 1.5 seconds, and counts only a real click with your mouse or touchpad.
 5. Click **Cancel**.
 6. Claude answers `Not approved in the approval window (Cancel, closed or timed out). Nothing was changed.`
 
 If no window appears, see [Troubleshooting](TROUBLESHOOTING.md).
 
-**Try the window on its own (optional).** This opens the same window without Claude and without Google, so nothing can be sent. It prints `True` only when you click **Approve**; Cancel, Enter, Esc, closing it or waiting 60 seconds print `False`:
+**Try the window on its own (optional).** This opens the same window without Claude and without Google, so nothing can be sent. It prints `True` only when you click **Approve** with the mouse; Cancel, Enter, Esc, closing it or waiting 60 seconds print `False`. If the window can't open, it shows an error that says why:
 
 ```powershell
 cd $HOME\google-ads-builder\builder
@@ -192,6 +192,34 @@ The whole team shares **one Google Cloud project**, and Google gives that projec
 - If it runs out, Claude shows: `the account's daily Google Ads API quota is used up (RESOURCE_EXHAUSTED)`. Nothing is broken.
 - The limit resets at **midnight Pacific time** (Google's time zone for the quota).
 - If the team runs out often, the admin can apply for a higher access level, such as **Basic**. See Google's [access levels](https://developers.google.com/google-ads/api/docs/api-policy/access-levels).
+
+### Optional: images with Codex
+
+`generate_image` makes ad images with Codex and your ChatGPT Plus allowance. Without Codex, Claude asks you for image files instead.
+
+1. Install [Node.js](https://nodejs.org) (the LTS version). Close PowerShell and open it again.
+2. Install Codex and sign in to ChatGPT once:
+
+   ```powershell
+   npm install -g @openai/codex
+   codex login
+   ```
+
+   If PowerShell says `running scripts is disabled on this system`, type `npm.cmd` and `codex.cmd` instead of `npm` and `codex`.
+
+3. Restart Claude Code. The builder finds the real program, `codex.exe`, where npm puts it:
+
+   `C:\Users\YOU\AppData\Roaming\npm\node_modules\@openai\codex\node_modules\@openai\codex-win32-x64\vendor\x86_64-pc-windows-msvc\bin\codex.exe`
+
+   On an ARM PC the folders are `codex-win32-arm64` and `aarch64-pc-windows-msvc`. This shows the file if it is there:
+
+   ```powershell
+   Get-ChildItem "$env:APPDATA\npm\node_modules\@openai\codex\node_modules\@openai\*\vendor\*\bin\codex.exe"
+   ```
+
+Is your `codex.exe` somewhere else? Put its full path in `builder.toml`, with forward slashes, such as `codex_path = "C:/Tools/codex/codex.exe"`.
+
+On Windows the builder runs only `codex.exe`, by its full path. It never runs `codex.cmd` or `codex.bat` (what npm puts on `PATH`), and it never takes a `codex.exe` from the folder Claude Code was started in, where anyone could have left one.
 
 ---
 
@@ -295,7 +323,9 @@ Type `/mcp`: both servers must show as connected.
 
 ### 8 to 10
 
-Do steps [8](#8-first-check-read-only), [9](#9-test-the-approval-window-and-click-cancel) and [10](#10-the-daily-api-limit) as on Windows. On a Mac the approval window is a standard macOS dialog with **Cancel** and **Approve**.
+Do steps [8](#8-first-check-read-only), [9](#9-test-the-approval-window-and-click-cancel) and [10](#10-the-daily-api-limit) as on Windows. On a Mac the approval window is a standard macOS dialog with **Cancel** and **Approve**. Never give Terminal, iTerm or VS Code **Accessibility** permission (System Settings → Privacy & Security → Accessibility): with it, a script Claude runs could click **Approve** for you.
+
+For `generate_image` on a Mac, install the ChatGPT app and sign in: the builder uses the Codex inside it.
 
 ---
 

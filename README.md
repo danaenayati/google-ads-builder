@@ -1,6 +1,6 @@
 # Google Ads campaign builder for Claude Code
 
-Ask Claude to build complete Google Ads campaigns from your account's own history. **Nothing changes in your account until you click Approve**, and every new campaign starts **paused**.
+Ask Claude to build complete Google Ads campaigns from your account's own history. **The builder changes nothing in your account until you click Approve**, and every new campaign starts **paused**. [SECURITY.md](SECURITY.md) says what that protects against and what it doesn't.
 
 It runs on your own computer, **Windows or Mac**. It is two servers that Claude Code starts for you:
 
@@ -33,7 +33,7 @@ Every change goes through the same four steps. You can't skip one.
 
 1. **Plan.** Claude saves a plan and shows you a summary: every setting, keyword, text, image and the budget.
 2. **Google checks it.** Google validates the whole plan in **check-only** mode. Nothing is created.
-3. **You approve it.** The builder opens **its own window** on your computer with the account, campaign, budget and every item. Only a click on **Approve** sends the change. Cancel, Enter, Esc, closing the window or waiting 60 seconds means no.
+3. **You approve it.** The builder opens **its own window** on your computer with the account, campaign, budget and every item. Only a click on **Approve** with the mouse sends the change. Cancel, Enter, Esc, closing the window or waiting 60 seconds means no.
 4. **Created paused.** New campaigns are always created **PAUSED**. You switch them on yourself in Google Ads. **No tool here can switch a campaign on.**
 
 One exception to know: an asset update (new or removed headlines, images or videos) on a campaign that is already running takes effect at once. The window says so before you approve.
@@ -58,7 +58,7 @@ One exception to know: an asset update (new or removed headlines, images or vide
 | `upload_images` | Uploads a plan's images to the account's asset library. | **Yes, after you approve** |
 | `update_campaign_assets` | Adds or removes texts, images and videos on one existing ad. | **Yes, after you approve** |
 
-`generate_image` needs Codex. On a Mac the builder uses the one inside the ChatGPT app; on Windows it uses `codex` if it is installed. Without it, Claude asks you for image files instead.
+`generate_image` needs Codex. On a Mac the builder uses the one inside the ChatGPT app; on Windows it uses `codex.exe` if it is installed (see [SETUP.md](docs/SETUP.md#optional-images-with-codex)). Without it, Claude asks you for image files instead.
 
 ## For developers
 
