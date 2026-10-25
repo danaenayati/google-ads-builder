@@ -21,6 +21,7 @@ WIN_APPROVE = "APPROVED\r\n"
 SYSTEM32 = "C:\\Windows\\System32"
 WINDIR = "C:\\Windows"
 POWERSHELL = "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"
+REALLY_WINDOWS = sys.platform == "win32"  # read now: the mac and windows fixtures change sys.platform
 
 
 def fake_run(calls, *, returncode=0, stdout=APPROVE, stderr="", raises=None):
@@ -288,7 +289,7 @@ def test_mac_the_lock_folder_is_made_private(mac, monkeypatch, tmp_path):
     monkeypatch.setattr(confirm, "LOCK_PATH", tmp_path / "new" / "approval-window.lock")
     monkeypatch.setattr(confirm, "_run", fake_run([]))
     assert real_ask_person("t", ["x"]) is True
-    if sys.platform != "win32":
+    if not REALLY_WINDOWS:
         assert (tmp_path / "new").stat().st_mode & 0o777 == 0o700
         assert confirm.LOCK_PATH.stat().st_mode & 0o777 == 0o600
 
@@ -554,7 +555,7 @@ def test_windows_powershell_is_found_by_its_absolute_path_under_system32():
 
 def test_windows_system32_comes_from_windows_itself():
     folders = confirm._windows_folders()
-    if sys.platform != "win32":
+    if not REALLY_WINDOWS:
         assert folders is None  # no Windows API to ask
         return
     system32, windir = folders
@@ -562,8 +563,9 @@ def test_windows_system32_comes_from_windows_itself():
     assert confirm.windows_folders() == (system32, windir) and os.path.isfile(confirm.powershell_path(system32))
 
 
+@pytest.mark.skipif(not REALLY_WINDOWS, reason="starts a real (missing) program with Windows-only flags")
 def test_windows_a_missing_powershell_is_unavailable(windows, monkeypatch, tmp_path):
-    folder = "Z:\\no-such-windows" if sys.platform != "win32" else str(tmp_path)
+    folder = str(tmp_path)
     monkeypatch.setattr(confirm, "_windows_folders", lambda: (folder + "\\System32", folder))
     monkeypatch.setattr(confirm, "_run", subprocess.run)  # the real runner, put back on purpose: no powershell.exe
     with pytest.raises(WindowUnavailable, match="couldn't start on this PC"):
@@ -655,7 +657,13 @@ public static class GadsTestAttacker
     [DllImport("user32.dll", SetLastError = true)] static extern uint SendInput(uint count, INPUT[] inputs, int size);
     [DllImport("user32.dll")] static extern bool IsWindowEnabled(IntPtr hwnd);
 
-    const uint BM_CLICK = 0x00F5, WM_LBUTTONDOWN = 0x0201, WM_LBUTTONUP = 0x0202, MOUSEEVENTF_LEFTDOWN = 0x0002, MOUSEEVENTF_LEFTUP = 0x0004;
+    const uint BM_CLICK = 0x00F5, WM_LBUTTONDOWN = 0x0201, WM_LBUTTONUP = 0x0202, MOUSEEVENTF_LEFTDOWN = 0x0002, MOUSEEVENTF_LEFTUP = 0x0004, WM_CLOSE = 0x0010;
+
+    public static bool Close(string title)
+    {
+        IntPtr form = FindWindowW(null, title);
+        return form != IntPtr.Zero && PostMessageW(form, WM_CLOSE, IntPtr.Zero, IntPtr.Zero);
+    }
 
     public static IntPtr FindApprove(string title, int waitMs)
     {
@@ -708,6 +716,7 @@ public static class GadsTestAttacker
 $approve = [GadsTestAttacker]::FindApprove($Title, 60000)
 if ($approve -eq [IntPtr]::Zero) { [Console]::Out.Write('NOT FOUND'); exit 2 }
 if ($Mode -eq 'find') { [Console]::Out.Write('FOUND'); exit 0 }
+if ($Mode -eq 'close') { [Console]::Out.Write([GadsTestAttacker]::Close($Title)); exit 0 }
 [Console]::Out.Write([GadsTestAttacker]::Attack($approve))
 """
 
@@ -755,19 +764,24 @@ def test_windows_injected_and_posted_clicks_never_approve(tmp_path):
 @REAL_WINDOW
 def test_windows_a_second_window_is_refused_while_one_is_open(tmp_path):
     title = f"Gads window test {uuid.uuid4().hex[:8]}"
-    first = _start_window(title, "The first window.", 8)
+    started = time.monotonic()
+    first = _start_window(title, "The first window.", 120)  # closed below, long before its own timer
     try:
         found = _attacker(tmp_path, title, "find")
-        second = _start_window(title + " (second)", "The second window must not open.", 8)
+        found_at = time.monotonic() - started
+        second = _start_window(title + " (second)", "The second window must not open.", 10)
         out2, err2 = second.communicate(timeout=120)
+        second_at = time.monotonic() - started
     finally:
+        closed = _attacker(tmp_path, title, "close")  # what the window's close button does: a No
         out1, err1 = first.communicate(timeout=120)
+    report = f"found at {found_at:.1f}s, second done at {second_at:.1f}s; second: {out2!r} {err2}; first: {err1}"
     assert found.stdout == "FOUND", found.stderr
-    assert (second.returncode, out2) == (4, "BUSY"), err2
+    assert (second.returncode, out2) == (4, "BUSY"), report
     with pytest.raises(WindowUnavailable) as raised:
         confirm.windows_answer(second.returncode, out2)
     assert str(raised.value) == confirm.ANOTHER_WINDOW
-    assert (first.returncode, out1) == (0, "DECLINED"), err1
+    assert closed.stdout == "True" and (first.returncode, out1) == (0, "DECLINED"), (closed.stdout, closed.stderr, err1)
 
 
 @REAL_WINDOW
