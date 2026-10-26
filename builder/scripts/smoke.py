@@ -96,7 +96,8 @@ instructions = init["result"].get("instructions") or ""
 print("tools:", ", ".join(tools))
 print("instructions:", len(instructions), "characters")
 if "Builder config not found" in reply:
-    fail("no builder.toml: save it in ~/.config/google-ads-mcp/ (or set GADS_BUILDER_CONFIG) and run again")
+    fail("no builder.toml: make it with scripts/make_settings.py (docs/SETUP.md step 5), or set "
+         "GADS_BUILDER_CONFIG, and run again")
 ok = (len(tools) == 15 and "unknown plan kind" in reply and 0 < len(instructions) < 2500
       and "`playbook` tool" in instructions and "## Safety" in safety and "Never retry" in safety)
 if not ok:

@@ -1,13 +1,10 @@
 # Setup
 
-About 30 minutes. Pick your computer: **[Windows](#windows)** or **[Mac](#mac)**. The admin who sets this up for a company once also reads **[For the admin](#for-the-admin-once-per-company)** at the end.
+About 40 minutes. Pick your computer: **[Windows](#windows)** or **[Mac](#mac)**.
 
-**Before you start, get two files from your admin** (on our team, Dana). Get them privately: in person, in a password manager or in a private chat. **Never through GitHub**, and never in a shared channel.
+**What you need:** a Google account that can open your Google Ads account in the Google Ads website (**Standard** access is enough). Everything else you make yourself in the steps below: your own Google sign-in file (step 3) and your own settings file, `builder.toml` (step 5). **Nobody needs to send you a file**, and no developer token is needed.
 
-1. The Google sign-in file, a "Desktop app" OAuth client. Its name looks like `client_secret_XXXX.json`.
-2. Your `builder.toml`, the builder's settings for your company's ad account.
-
-Your Google account also needs access to the Google Ads account. Ask your admin if you can't open it in Google Ads.
+In a team that already shares one setup? See **[Sharing one setup with a team](#sharing-one-setup-with-a-team-optional)** at the end: you can use the team's sign-in file instead of making your own.
 
 In the commands below, `YOU` stands for your user name on the computer. You can copy each command as it is: `$HOME` (Windows) and `~` or `$HOME` (Mac) mean your own user folder.
 
@@ -74,9 +71,19 @@ This makes the folder `C:\Users\YOU\google-ads-builder`.
 
 **Without Git:** open [github.com/danaenayati/google-ads-builder](https://github.com/danaenayati/google-ads-builder), click **Code → Download ZIP**, and extract it into `C:\Users\YOU\`. Rename the folder `google-ads-builder-main` to `google-ads-builder`.
 
-### 3. Save the sign-in file
+### 3. Make your own Google sign-in file (once, about 10 minutes)
 
-Save the `client_secret_XXXX.json` file from your admin in your **Downloads** folder.
+The builder signs in to Google Ads with a sign-in file (an "OAuth client") from **your own** Google Cloud project. It is free.
+
+1. Open [console.cloud.google.com](https://console.cloud.google.com) and sign in with **the Google account that has Google Ads access**. Accept the terms if Google asks.
+2. **Make a project:** click the project picker at the top → **New project**. Name it, for example, `Google Ads builder`, and click **Create**. Make sure it is the selected project at the top.
+3. **Turn on the Google Ads API:** open **APIs & Services → Library**, search for **Google Ads API**, open it and click **Enable**. On the same page, apply for API access if Google offers it: Google grants access to the Cloud project (see [access levels](https://developers.google.com/google-ads/api/docs/api-policy/access-levels)).
+4. **Sign-in screen:** open **Google Auth Platform** (search for it at the top) and click **Get started**. Give the app a name (such as `Google Ads builder`) and your email address, then:
+   - If your Google account belongs to a company Google Workspace, choose **Internal**.
+   - Otherwise choose **External**. Then open **Audience → Test users → Add users** and add **your own** email address. (While the app is in "Testing", Google asks you to sign in again every 7 days: just run step 4 again.)
+5. **The sign-in file:** open **Google Auth Platform → Clients → Create client**. Choose **Desktop app** (not "Web application"), click **Create**, then **Download JSON**. Save the file in your **Downloads** folder. Its name looks like `client_secret_XXXX.json`.
+
+Keep this file private: never put it on GitHub or in a shared chat. Don't delete the client later: that signs you out.
 
 ### 4. Sign in to Google once
 
@@ -95,13 +102,20 @@ The folder `%USERPROFILE%\.config\google-ads-mcp\` now holds your login (`google
 
 Signed in to several Google accounts in your browser? Run `$env:GADS_NO_BROWSER = "1"` first, run the command again, and open the link it prints in a private window.
 
-### 5. Save builder.toml
+### 5. Make your settings (builder.toml)
 
-Save the `builder.toml` from your admin in your Downloads folder, then copy it next to your login:
+This reads your Google Ads account (it changes nothing) and writes `builder.toml`, the builder's settings, next to your login:
 
 ```powershell
-Copy-Item "$HOME\Downloads\builder.toml" "$HOME\.config\google-ads-mcp\builder.toml"
+cd $HOME\google-ads-builder
+uv run --no-project --with google-ads python scripts/make_settings.py
 ```
+
+1. If your login can open several ad accounts, it lists them: type the number of the one to use. Accounts you reach through a manager account are listed too, and the script sets that up for you.
+2. It suggests the rest from the account: the daily budget cap, the country, the websites your ads link to and the apps your App campaigns promote. Press **Enter** to accept a suggestion, or type your own.
+3. It prints `Saved C:\Users\YOU\.config\google-ads-mcp\builder.toml`.
+
+You can open `builder.toml` in Notepad later to change anything, such as `blocked_words` (competitor names that must never appear in your ads). Run the script again any time to start over; it keeps the old file as a backup.
 
 Check that the builder starts with it. The first run downloads Python and the builder's packages, which takes a few minutes:
 
@@ -187,11 +201,11 @@ On a Mac, run `cd ~/google-ads-builder/builder` first, then the same `uv run` li
 
 ### 10. The daily API limit
 
-The whole team shares **one Google Cloud project**, and Google gives that project a daily limit of API requests. Big reports and checks use more of it.
+Google gives your Cloud project a daily limit of API requests (everyone who uses the same sign-in file shares it). Big reports and checks use more of it.
 
 - If it runs out, Claude shows: `the account's daily Google Ads API quota is used up (RESOURCE_EXHAUSTED)`. Nothing is broken.
 - The limit resets at **midnight Pacific time** (Google's time zone for the quota).
-- If the team runs out often, the admin can apply for a higher access level, such as **Basic**. See Google's [access levels](https://developers.google.com/google-ads/api/docs/api-policy/access-levels).
+- If you run out often, apply for a higher access level for your Cloud project, such as **Basic**. See Google's [access levels](https://developers.google.com/google-ads/api/docs/api-policy/access-levels).
 
 ### Optional: images with Codex
 
@@ -267,9 +281,9 @@ git clone https://github.com/danaenayati/google-ads-builder.git
 
 This makes the folder `/Users/YOU/google-ads-builder`. Without Git, download the ZIP as described for Windows, extract it into your home folder and rename it to `google-ads-builder`.
 
-### 3. Save the sign-in file
+### 3. Make your own Google sign-in file
 
-Save `client_secret_XXXX.json` from your admin in your **Downloads** folder.
+Do [step 3 of the Windows guide](#3-make-your-own-google-sign-in-file-once-about-10-minutes): it happens in the browser and is the same on a Mac. Save the downloaded `client_secret_XXXX.json` in your **Downloads** folder.
 
 ### 4. Sign in to Google once
 
@@ -280,11 +294,16 @@ uv run --no-project --with google-auth-oauthlib python scripts/signin.py ~/Downl
 
 Sign in with the Google account that has Google Ads access, and click **Allow**. The script saves your login in `~/.config/google-ads-mcp/` (a folder only your Mac user can open). Signed in to several Google accounts? Put `GADS_NO_BROWSER=1 ` in front of the command and open the printed link in a private window.
 
-### 5. Save builder.toml
+### 5. Make your settings (builder.toml)
 
 ```bash
-cp ~/Downloads/builder.toml ~/.config/google-ads-mcp/builder.toml
-chmod 600 ~/.config/google-ads-mcp/builder.toml
+cd ~/google-ads-builder
+uv run --no-project --with google-ads python scripts/make_settings.py
+```
+
+Pick your ad account by its number and press **Enter** to accept each suggestion, as described for [Windows](#5-make-your-settings-buildertoml). Then check that the builder starts with it:
+
+```bash
 cd ~/google-ads-builder/builder
 uv run --frozen python scripts/smoke.py
 ```
@@ -334,13 +353,16 @@ For `generate_image` on a Mac, install the ChatGPT app and sign in: the builder 
 1. Delete the login folder: `%USERPROFILE%\.config\google-ads-mcp\` on Windows, `~/.config/google-ads-mcp/` on a Mac.
 2. Remove the servers: `claude mcp remove google-ads -s user` and `claude mcp remove google-ads-builder -s user`.
 3. Revoke the sign-in at [myaccount.google.com/permissions](https://myaccount.google.com/permissions).
+4. If you made your own Cloud project only for this, you can delete it in [console.cloud.google.com](https://console.cloud.google.com) (**IAM & Admin → Settings → Shut down**).
 
 ---
 
-## For the admin (once per company)
+## Sharing one setup with a team (optional)
 
-1. **Google Cloud project.** In [console.cloud.google.com](https://console.cloud.google.com), pick or create a project, ideally in your company's Google Workspace. Open **APIs & Services → Library → Google Ads API → Enable**. On the **Google Ads API** page, apply for API access: Google grants it to the Cloud project. See [access levels](https://developers.google.com/google-ads/api/docs/api-policy/access-levels).
-2. **Sign-in screen.** In **Google Auth Platform → Audience**, click **Make internal** if you can, so only your company's accounts can sign in. Otherwise add each person under **Test users** (their sign-in then expires every 7 days) or publish the app.
-3. **OAuth client.** In **Google Auth Platform → Clients → Create client**, choose **Desktop app** (not "Web application"), click **Create** and **Download JSON** at once. Don't delete this client later: that breaks everyone's sign-in. Share the JSON file privately.
-4. **builder.toml.** Copy [`config/builder.toml.example`](../config/builder.toml.example) and fill it in: the ad account, its currency, a daily budget cap, the allowed apps and your website `domains`. Keep the folders as `~/...` paths so the same file works on Windows and Mac, and leave `codex_path` out so each computer uses its own default. To list the accounts and currencies your login can reach (read-only): `uv run --no-project --with google-ads python scripts/check_access.py`. Share the file privately.
-5. **Access.** Give each person's Google account access to the Google Ads account. **Standard** access is enough; it can't manage users or billing.
+A team can share one Cloud project instead of each person making their own. One person (the admin) does this once:
+
+1. Make the Cloud project, turn on the Google Ads API and make the sign-in screen as in [step 3](#3-make-your-own-google-sign-in-file-once-about-10-minutes). Choose **Internal** if everyone is in the company's Google Workspace; otherwise add each person under **Test users**, or publish the app.
+2. Make one **Desktop app** client and download its JSON. Share it **privately** (in person, in a password manager or a private chat; never on GitHub or in a shared channel). Don't delete this client later: that signs everyone out.
+3. Give each person's Google account access to the Google Ads account. **Standard** access is enough; it can't manage users or billing.
+
+Each person then follows this guide, using the shared file in step 4 instead of making one in step 3, and runs `make_settings.py` in step 5 as usual. Everyone who uses the same file shares one daily API limit.

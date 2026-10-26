@@ -23,12 +23,12 @@ Claude acts as **the signed-in Google user**. It can do exactly what that user c
 ### 4. Login stored privately, never shared
 - The sign-in asks only for the Google Ads scope (`https://www.googleapis.com/auth/adwords`): no Gmail, Drive or anything else.
 - `scripts/signin.py` saves the login in `~/.config/google-ads-mcp/` (Windows: `%USERPROFILE%\.config\google-ads-mcp\`). On a Mac it sets the folder to `700` and the files to `600`, so only your user can read them. On Windows the folder sits in your user profile, which Windows keeps private to your account and the computer's administrators.
-- `.gitignore` blocks every credential file name from this repo. The OAuth client and `builder.toml` are shared privately by the admin, never through GitHub.
+- `.gitignore` blocks every credential file name from this repo. Each person makes their own OAuth client in their own Cloud project and their own `builder.toml` with `scripts/make_settings.py` (or a team shares them privately), never through GitHub.
 - The example Claude Code settings deny Claude's Read tool on that folder: `Read(~/.config/google-ads-mcp/**)`.
 - To revoke at any time, go to [myaccount.google.com/permissions](https://myaccount.google.com/permissions).
 
 ### 5. Sign-in limited to the company
-If the admin sets the OAuth app's audience to **Internal**, only accounts in the company's Google Workspace can sign in.
+If you set the OAuth app's audience to **Internal**, only accounts in the company's Google Workspace can sign in.
 
 ### 6. Limited damage per day
 Google's API access levels cap how many operations a Cloud project can make each day (see [access levels](https://developers.google.com/google-ads/api/docs/api-policy/access-levels)). New campaigns are always created **paused**, and no tool here can switch a campaign on.

@@ -11,7 +11,7 @@ It runs on your own computer, **Windows or Mac**. It is two servers that Claude 
 
 **You need:** a Windows 10 or 11 PC or a Mac, [Claude Code](https://claude.com/claude-code) (in the terminal or in VS Code), `uv`, Git (or the ZIP download), and a Google account that can open your Google Ads account.
 
-**Set it up:** follow [docs/SETUP.md](docs/SETUP.md). It has exact steps for Windows (PowerShell) and for Mac.
+**Set it up:** follow [docs/SETUP.md](docs/SETUP.md). It has exact steps for Windows (PowerShell) and for Mac. You make your own Google sign-in file (in your own free Google Cloud project) and your own settings with `scripts/make_settings.py`: nobody needs to send you a file, and no developer token is needed.
 
 - [SECURITY.md](SECURITY.md): how changes are kept safe, and the risks that remain.
 - [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md): errors and their fixes.

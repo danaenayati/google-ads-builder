@@ -16,22 +16,22 @@ Grouped by where you see the problem. "Nothing changed" means exactly that: no c
 
 | You see | Why | Fix |
 |---|---|---|
-| **Access blocked: … has not completed the Google verification process** (`access_denied`) | The sign-in app is in **Testing** and your account isn't a test user | Ask your admin to add you under **Test users**, or to make the app internal |
+| **Access blocked: … has not completed the Google verification process** (`access_denied`) | The sign-in app is in **Testing** and your account isn't a test user | In the Cloud project the sign-in file came from, add your account under **Google Auth Platform → Audience → Test users** (or make the app **Internal**). With a team's shared file, ask whoever made it |
 | **Access blocked: … can only be used within its organization** (`org_internal`) | The sign-in app is **Internal**, and your account belongs to another organization | Sign in with your company account |
-| **Access blocked: The OAuth client was deleted** (`deleted_client`) | The admin deleted the OAuth client | Ask the admin for a new **Desktop app** client and run `signin.py` again |
+| **Access blocked: The OAuth client was deleted** (`deleted_client`) | The OAuth client was deleted in its Cloud project | Make a new **Desktop app** client (SETUP.md step 3) and run `signin.py` again |
 | **500. That's an error.** | Usually a browser signed in to several Google accounts, or a setting changed minutes ago | Open the link in a **private window** (see `GADS_NO_BROWSER` in SETUP.md) and try again after a few minutes |
-| `signin.py` says "'web' client" | The file is a **Web application** client | The admin must create a **Desktop app** client |
+| `signin.py` says "'web' client" | The file is a **Web application** client | Make a **Desktop app** client instead (SETUP.md step 3) |
 
 ## When Claude or the scripts call Google Ads
 
 | You see | Why | Fix |
 |---|---|---|
-| `SMOKE FAILED: no builder.toml` or `Builder config not found` | `builder.toml` isn't in `.config\google-ads-mcp` (Windows) or `~/.config/google-ads-mcp` (Mac) | Save it there (SETUP.md step 5), or fix the `GADS_BUILDER_CONFIG` path in the `claude mcp add` command |
+| `SMOKE FAILED: no builder.toml` or `Builder config not found` | `builder.toml` isn't in `.config\google-ads-mcp` (Windows) or `~/.config/google-ads-mcp` (Mac) | Make it with `scripts/make_settings.py` (SETUP.md step 5), or fix the `GADS_BUILDER_CONFIG` path in the `claude mcp add` command |
 | `Your default credentials were not found` | `adc.json` is missing, or the path in `GOOGLE_APPLICATION_CREDENTIALS` is wrong | Run `signin.py` again, and check the path in the `google-ads` server |
-| `CLOUD_PROJECT_NOT_APPROVED_FOR_PRODUCTION` | The company's Cloud project has no API access yet | The admin applies for an access level (SETUP.md, "For the admin") |
-| `the account's daily Google Ads API quota is used up (RESOURCE_EXHAUSTED)` | The team's shared daily limit is used up. The connection is fine | Wait for the time in the message, or until midnight Pacific time. If it came during a real change, look in the account before trying again |
+| `CLOUD_PROJECT_NOT_APPROVED_FOR_PRODUCTION` | Your Cloud project has no Google Ads API access yet | On the **Google Ads API** page of your Cloud project, apply for an [access level](https://developers.google.com/google-ads/api/docs/api-policy/access-levels) |
+| `the account's daily Google Ads API quota is used up (RESOURCE_EXHAUSTED)` | Your Cloud project's daily limit is used up (shared by everyone using the same sign-in file). The connection is fine | Wait for the time in the message, or until midnight Pacific time. If it came during a real change, look in the account before trying again |
 | `larger than the message size limit (RESOURCE_EXHAUSTED)` | Too many or too large images in one request, or a report with too many rows. Not the daily limit | Send less at once: fewer images, fewer campaigns or a shorter date range |
-| `USER_PERMISSION_DENIED` | Your Google account can't open that ad account, or you reach it through a manager account | Ask your admin for access to the account |
+| `USER_PERMISSION_DENIED` | Your Google account can't open that ad account, or you reach it through a manager account | Ask the ad account's owner to add your Google account (Standard access is enough). If you reach it through a manager account, run `scripts/make_settings.py` again and pick it from the list: it sets the manager up for you |
 | `CUSTOMER_NOT_ENABLED` | That ad account is cancelled or was never finished | Ignore it if your real account works |
 | `Couldn't reach Google Ads`, `500 Stream removed (RST_STREAM …)` or `UNAVAILABLE` | Your network blocks or cuts connections to Google's APIs. Normal web pages may still load | Use a network that reaches Google APIs. If your network blocks Google APIs, ask your IT team; an ad blocker or DNS filter may also block `googleads.googleapis.com`, so allow it there |
 | The check scripts fail only when **Claude** runs them | Claude Code's command sandbox routes traffic through a proxy that this Google connection doesn't work with | Run them yourself in PowerShell or Terminal |
